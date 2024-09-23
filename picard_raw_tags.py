@@ -8,7 +8,7 @@ PLUGIN_API_VERSIONS = ["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7"]
 PLUGIN_LICENSE = ["MIT"]
 PLUGIN_LICENSE_URL = "https://opensource.org/license/MIT"
 
-from typing import List, Tuple, Union
+from typing import List, Set, Tuple, Union
 
 from PyQt5 import QtCore, QtWidgets
 
@@ -106,23 +106,33 @@ class ShowRawTags(BaseAction):
 
     def callback(self, objs) -> None:
         data: "FileDataMap" = []
+        seen_paths: Set[str] = set()
 
         def parse_item(obj: Union[Album, File, Track]):
             if isinstance(obj, File):
                 path = obj.filename
+                if path in seen_paths:
+                    return
+
                 try:
                     mutagenFile = MutagenFile(path)
                     data.append((obj.base_filename, path, mutagenFile.items()))
                 except BaseException as e:
                     log.error(f"[{PLUGIN_NAME}] failure parsing file {path}: {e}")
+
+                seen_paths.add(path)
             elif isinstance(obj, Track):
                 for file in obj.files:
+                    path = file.filename
                     try:
-                        path = file.filename
+                        if path in seen_paths:
+                            return
                         mutagenFile = MutagenFile(path)
                         data.append((file.base_filename, path, mutagenFile.items()))
                     except BaseException as e:
                         log.error(f"[{PLUGIN_NAME}] failure parsing file {path}: {e}")
+
+                    seen_paths.add(path)
             elif isinstance(obj, Album):
                 for track_or_file in obj.iterfiles():
                     parse_item(track_or_file)
