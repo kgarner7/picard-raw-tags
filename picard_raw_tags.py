@@ -8,7 +8,7 @@ PLUGIN_API_VERSIONS = ["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7"]
 PLUGIN_LICENSE = ["MIT"]
 PLUGIN_LICENSE_URL = "https://opensource.org/license/MIT"
 
-from typing import List, Set, Tuple, Union
+from typing import Any, List, Set, Tuple, Union
 
 from PyQt5 import QtCore, QtWidgets
 
@@ -23,15 +23,59 @@ from picard.ui.ui_infodialog import Ui_InfoDialog
 from picard.ui.util import StandardButton
 
 
-FileDataMap = List[Tuple[str, str, List[Tuple[str, str]]]]
+FileDataMap = List[Tuple[str, str, List[Tuple[str, Any]]]]
+ItemCapLength = 1000
+
+
+def format_item(item: Any) -> Union[str, List[str]]:
+    if isinstance(item, str):
+        return item
+    elif isinstance(item, list):
+        return [str(format_item(list_item)) for list_item in item]
+    else:
+        stringified = str(item)
+        if len(stringified) > ItemCapLength:
+            stringified = stringified[:ItemCapLength] + "..."
+        return stringified
+
+
+class RawTagItem(QtWidgets.QItemDelegate):
+    def createEditor(self, parent, option, index):
+        if not index.isValid():
+            return None
+        editor = QtWidgets.QPlainTextEdit(parent)
+        editor.setReadOnly(True)
+        editor.setFrameStyle(
+            editor.style().styleHint(
+                QtWidgets.QStyle.StyleHint.SH_ItemView_DrawDelegateFrame, None, editor
+            )
+        )
+        return editor
+
+    def sizeHint(self, option, index):
+        # Expand the row for multiline content, but limit the maximum row height.
+        size_hint = super().sizeHint(option, index)
+        return QtCore.QSize(size_hint.width(), min(160, size_hint.height()))
 
 
 class RawTagTable(QtWidgets.QTableWidget):
     COLUMN_TAG = 0
     COLUMN_VALUE = 1
+    KEY_FLAGS = QtCore.Qt.ItemFlag.ItemIsEnabled | QtCore.Qt.ItemFlag.ItemIsSelectable
+    TAG_FLAGS = KEY_FLAGS | QtCore.Qt.ItemFlag.ItemIsEditable
 
-    def __init__(self, tags: List[Tuple[str, str]], parent=None):
+    def __init__(self, tags: List[Tuple[str, Any]], parent=None):
         super().__init__(parent=parent)
+
+        processed_list: List[Tuple[str, str]] = []
+        for key, unprocessed_val in tags:
+            value = format_item(unprocessed_val)
+            if isinstance(value, list):
+                for idx, processed_val in enumerate(value):
+                    key = key if idx == 0 else f"[{idx}]"
+                    processed_list.append((key, processed_val))
+            else:
+                processed_list.append((key, value))
 
         self.setAccessibleName(_("metadata view"))
         self.setAccessibleDescription(_("Displays raw tags for selected files"))
@@ -53,25 +97,21 @@ class RawTagTable(QtWidgets.QTableWidget):
         self.setTabKeyNavigation(False)
         self.setStyleSheet("QTableWidget {border: none;}")
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_MacShowFocusRect, True)
+        self.setItemDelegate(RawTagItem(self))
+        self.setWordWrap(False)
 
-        self.setRowCount(len(tags))
+        self.setRowCount(len(processed_list))
 
-        for idx, (key, value) in enumerate(tags):
+        for idx, (key, value) in enumerate(processed_list):
             tag_item = QtWidgets.QTableWidgetItem()
-            tag_item.setFlags(QtCore.Qt.ItemFlag.ItemIsEnabled)
+            tag_item.setFlags(self.KEY_FLAGS)
             self.setItem(idx, self.COLUMN_TAG, tag_item)
             tag_item.setText(key)
 
             value_item = QtWidgets.QTableWidgetItem()
-            value_item.setFlags(QtCore.Qt.ItemFlag.ItemIsEnabled)
+            value_item.setFlags(self.TAG_FLAGS)
             self.setItem(idx, self.COLUMN_VALUE, value_item)
-            if not isinstance(value, str):
-                stringified = str(value)
-                if len(stringified) > 1000:
-                    stringified = stringified[:1000] + "..."
-                value_item.setText(stringified)
-            else:
-                value_item.setText(str(value))
+            value_item.setText(value)
             self.setRowHeight(idx, self.sizeHintForRow(idx))
 
 
