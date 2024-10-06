@@ -4,7 +4,7 @@ PLUGIN_DESCRIPTION = """
 This plugin is to show raw tags of a file
 """
 PLUGIN_VERSION = "0.1"
-PLUGIN_API_VERSIONS = ["2.0", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7"]
+PLUGIN_API_VERSIONS = ["2.0"]
 PLUGIN_LICENSE = ["MIT"]
 PLUGIN_LICENSE_URL = "https://opensource.org/license/MIT"
 
