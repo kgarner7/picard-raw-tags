@@ -4,7 +4,7 @@ PLUGIN_DESCRIPTION = """
 This plugin is to show raw tags of a file
 """
 PLUGIN_VERSION = "0.1"
-PLUGIN_API_VERSIONS = ["2.0"]
+PLUGIN_API_VERSIONS = ["2"]
 PLUGIN_LICENSE = ["MIT"]
 PLUGIN_LICENSE_URL = "https://opensource.org/license/MIT"
 
@@ -70,6 +70,12 @@ class RawTagTable(QtWidgets.QTableWidget):
         processed_list: List[Tuple[str, str]] = []
         for key, unprocessed_val in tags:
             value = format_item(unprocessed_val)
+
+            if isinstance(value, str):
+                value = value.split("\u0000")
+                if not value[-1]:
+                    value = value[:-1]
+
             if isinstance(value, list):
                 for idx, processed_val in enumerate(value):
                     key = key if idx == 0 else f"[{idx}]"
